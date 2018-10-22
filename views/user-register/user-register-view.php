@@ -51,41 +51,6 @@ $modelo->del_user( $parametros );
 $lista = $modelo->get_user_list();
 ?>
 
-
-<table class="list-table">
-	<thead>
-		<tr>
-			<th>ID</th>
-			<th>Usuário</th>
-			<th>Name</th>
-			<th>Permissões</th>
-			<th>Edição</th>
-		</tr>
-	</thead>
-
-	<tbody>
-
-		<?php foreach ($lista as $fetch_userdata): ?>
-
-			<tr>
-
-				<td> <?php echo $fetch_userdata['user_id'] ?> </td>
-				<td> <?php echo $fetch_userdata['user'] ?> </td>
-				<td> <?php echo $fetch_userdata['user_name'] ?> </td>
-				<td> <?php echo implode( ',', unserialize( $fetch_userdata['user_permissions'] ) ) ?> </td>
-
-				<td>
-					<a href="<?php echo HOME_URI ?>/user-register/index/edit/<?php echo $fetch_userdata['user_id'] ?>">Edit</a>
-					<a href="<?php echo HOME_URI ?>/user-register/index/del/<?php echo $fetch_userdata['user_id'] ?>">Delete</a>
-				</td>
-
-			</tr>
-
-		<?php endforeach;?>
-
-	</tbody>
-</table>
-
 <div class="panel panel-default">
 		<div class="panel-heading">
 				Lista de Usuarios
@@ -111,7 +76,7 @@ $lista = $modelo->get_user_list();
 										<td><?php echo $fetch_userdata['user_name'] ?></td>
 										<td><?php echo implode( ',', unserialize( $fetch_userdata['user_permissions'] ) ) ?></td>
 										<td align="center"><a href="<?php echo HOME_URI ?>/user-register/index/edit/<?php echo $fetch_userdata['user_id'] ?>"><i class="fa fa-edit"></i></a></td>
-										<td align="center"><a href="<?php echo HOME_URI ?>/user-register/index/del/<?php echo $fetch_userdata['user_id'] ?>"><i class="fa fa-trash"></i></a></td>
+										<td align="center"><a href="<?php echo HOME_URI ?>/user-register/index/del/<?php echo $fetch_userdata['user_id'] ?>"><i class="fa fa-trash-o"></i></a></td>
 								</tr>
 							<?php endforeach;?>
 
