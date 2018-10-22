@@ -1,415 +1,295 @@
 <?php
 
 /**
- * Modelo para gerenciar agenda
+ * Classe para registros de agenda
  *
- * @package myMVC
+ * @package agendaMVC
  * @since 0.1
  */
-class AgendaModel extends MainModel {
+class AgendaModel {
 
     /**
-     * $posts_per_page
+     * $form_data
      *
-     * Receberá o número de posts por página para configurar a listagem da
-     * agenda. Também utilizada na paginação.
+     * Os dados do formulário de envio.
      *
      * @access public
      */
-    public $posts_por_pagina = 15;
+    public $form_data;
 
     /**
-     * Construtor para essa classe
+     * $form_msg
      *
-     * Configura o DB, o controlador, os parâmetros e dados do usuário.
+     * As mensagens de feedback para o usuário.
+     *
+     * @access public
+     */
+    public $form_msg;
+
+    /**
+     * $db
+     *
+     * O objeto da nossa conexão PDO
+     *
+     * @access public
+     */
+    public $db;
+
+    /**
+     * Construtor
+     *
+     * Carrega  o DB.
      *
      * @since 0.1
      * @access public
-     * @param object $db Objeto da nossa conexão PDO
-     * @param object $controller Objeto do controlador
      */
-    public function __construct($db = false, $controller = null) {
-        // Configura o DB (PDO)
+    public function __construct($db = false) {
         $this->db = $db;
-
-        // Configura o controlador
-        $this->controller = $controller;
-
-        // Configura os parâmetros
-        $this->parametros = $this->controller->parametros;
-
-        // Configura os dados do usuário
-        $this->userdata = $this->controller->userdata;
     }
 
     /**
-     * Lista notícias
+     * Valida o formulário de envio
+     *
+     * Este método pode inserir ou atualizar dados dependendo do campo de
+     * usuário.
      *
      * @since 0.1
      * @access public
-     * @return array Os dados da base de dados
      */
-    public function listar_agenda() {
+    public function validate_register_form() {
 
-        // Configura as variáveis que vamos utilizar
-        $id = $where = $query_limit = null;
+        // Configura os dados do formulário
+        $this->form_data = array();
 
-        // Verifica se um parâmetro foi enviado para carregar uma agenda
-        if (is_numeric(chk_array($this->parametros, 0))) {
+        // Verifica se algo foi postado
+        if ('POST' == $_SERVER['REQUEST_METHOD'] && !empty($_POST)) {
 
-            // Configura o ID para enviar para a consulta
-            $id = array(chk_array($this->parametros, 0));
+            // Faz o loop dos dados do post
+            foreach ($_POST as $key => $value) {
 
-            // Configura a cláusula where da consulta
-            $where = " WHERE age_id = ? ";
+                // Configura os dados do post para a propriedade $form_data
+                $this->form_data[$key] = $value;
+                
+                //echo $key.' - '.$value.'<br />';
+                
+                // Nós não permitiremos nenhum campos em branco
+                if (empty($value)) {
+
+                    // Configura a mensagem
+                    $this->form_msg = '<p class="form_error">Existem Dados Vazios.</p>';
+                    return;
+                }
+            }
+        } else {
+            // Termina se nada foi enviado
+            return;
         }
 
-        // Configura a página a ser exibida
-        $pagina = !empty($this->parametros[1]) ? $this->parametros[1] : 1;
-
-        // A páginação inicia do 0
-        $pagina--;
-
-        // Configura o número de posts por página
-        $posts_por_pagina = $this->posts_por_pagina;
-
-        // O offset dos posts da consulta
-        $offset = $pagina * $posts_por_pagina;
-
-        /*
-          Esta propriedade foi configurada no agenda-model.php para
-          prevenir limite ou paginação.
-         */
-        if (empty($this->sem_limite)) {
-
-            // Configura o limite da consulta
-            $query_limit = " LIMIT $offset,$posts_por_pagina ";
+        // Verifica se a propriedade $form_data foi preenchida
+        if (empty($this->form_data)) {
+            return;
         }
 
-        // Faz a consulta
-        $query = $this->db->query(
-                'SELECT * FROM agenda ' . $where . ' ORDER BY age_id DESC' . $query_limit, $id
+        // Verifica se o usuário existe
+        $db_check_user = $this->db->query(
+                'SELECT * FROM `agenda` WHERE `age_id` = ?', array(
+            chk_array($this->form_data, 'age_id')
+                )
         );
 
-        // Retorna
-        return $query->fetchAll();
-    }
-
-// listar_agenda
-
-    /**
-     * Obtém a agenda e atualiza os dados se algo for postado
-     *
-     * Configura a propriedade $this->form_data.
-     *
-     * @since 0.1
-     * @access public
-     */
-    public function obtem_agenda() {
-
-        // Verifica se o primeiro parâmetro é "edit"
-        if (chk_array($this->parametros, 0) != 'edit') {
+        // Verifica se a consulta foi realizada com sucesso
+        if (!$db_check_user) {
+            $this->form_msg = '<p class="form_error">Internal error.</p>';
             return;
         }
 
-        // Verifica se o segundo parâmetro é um número
-        if (!is_numeric(chk_array($this->parametros, 1))) {
+        // Obtém os dados da base de dados MySQL
+        $fetch_user = $db_check_user->fetch();
+
+        // Configura o ID do usuário
+        $age_id = $fetch_user['age_id'];
+
+        // Verifica se as permissões tem algum valor inválido:
+        // 0 a 9, A a Z e , . - _
+        if (empty($this->form_data['age_nome'])) {
+            $this->form_msg = '<p class="form_error">Digite um nome.</p>';
             return;
         }
+        
+        if (empty($this->form_data['age_telefone'])) {
+            $this->form_msg = '<p class="form_error">Digite um Telefone.</p>';
+            return;
+        }
+        
 
-        // Configura o ID da agenda
-        $age_id = chk_array($this->parametros, 1);
 
-        /*
-          Verifica se algo foi postado e se está vindo do form que tem o campo
-          insere_agenda.
+        // Se o ID do usuário não estiver vazio, atualiza os dados
+        if (!empty($age_id)) {
 
-          Se verdadeiro, atualiza os dados conforme a requisição.
-         */
-        if ('POST' == $_SERVER['REQUEST_METHOD'] && !empty($_POST['insere_agenda'])) {
+            $query = $this->db->update('agenda', 'age_id', $user_id, array(
+                'age_nome' => chk_array($this->form_data, 'age_nome'),
+                'age_telefone' => chk_array($this->form_data, 'age_telefone'),
+                'age_celular' => chk_array($this->form_data, 'age_celular'),
+                'age_comercial' => chk_array($this->form_data, 'age_comercial'),
+            ));
 
-            // Remove o campo insere_agenda para não gerar problema com o PDO
-            unset($_POST['insere_agenda']);
+            // Verifica se a consulta está OK e configura a mensagem
+            if (!$query) {
+                $this->form_msg = '<p class="form_error">Erro na pesquisa.</p>';
+                // Termina
+                return;
+            } else {
+                $this->form_msg = '<p class="form_success">Agenda atualizada com Sucesso.</p>';
+                // Termina
+                return;
+            }
+            // Se o ID do usuário estiver vazio, insere os dados
+        } else {
 
-            // Verifica se o nome foi enviado
-            $data = chk_array($_POST, 'age_nome');
+            // Executa a consulta
+            $query = $this->db->insert('agenda', array(
+                'age_nome' => chk_array($this->form_data, 'age_nome'),
+                'age_telefone' => chk_array($this->form_data, 'age_telefone'),
+                'age_celular' => chk_array($this->form_data, 'age_celular'),
+                'age_comercial' => chk_array($this->form_data, 'age_comercial'),
+            ));
 
-            // Adiciona a data no $_POST
-            //$_POST['noticia_data'] = $nova_data;
-            $_POST['age_telefone'] = $telefone;
-            $_POST['age_celular'] = $celular;
-            $_POST['age_comercial'] = $comercial;
+            // Verifica se a consulta está OK e configura a mensagem
+            if (!$query) {
+                $this->form_msg = '<p class="form_error">Erro de novo.</p>'.__LINE__;
 
-            // Atualiza os dados
-            $query = $this->db->update('agenda', 'age_id', $age_id, $_POST);
+                // Termina
+                return;
+            } else {
+                $this->form_msg = '<p class="form_success">Agenda Salva com sucesso</p>';
 
-            // Verifica a consulta
-            if ($query) {
-                // Retorna uma mensagem
-                $this->form_msg = '<p class="success">Agenda atualizada com sucesso!</p>';
+                // Termina
+                return;
             }
         }
+    }
 
-        // Faz a consulta para obter o valor
-        $query = $this->db->query(
-                'SELECT * FROM agenda WHERE age_id = ? LIMIT 1', array($age_id)
-        );
+// validate_register_form
 
-        // Obtém os dados
-        $fetch_data = $query->fetch();
+    /**
+     * Obtém os dados do formulário
+     *
+     * Obtém os dados para usuários registrados
+     *
+     * @since 0.1
+     * @access public
+     */
+    public function get_register_form($age_id = false) {
 
-        // Se os dados estiverem nulos, não faz nada
-        if (empty($fetch_data)) {
+        // O ID do registro que vamos pesquisar
+        $s_age_id = false;
+
+        // Verifica se você enviou algum ID para o método
+        if (!empty($age_id)) {
+            $s_age_id = (int) $age_id;
+        }
+
+        // Verifica se existe um ID de usuário
+        if (empty($s_age_id)) {
+            return;
+        }
+
+        // Verifica na base de dados
+        $query = $this->db->query('SELECT * FROM `agenda` WHERE `age_id` = ?', array($s_age_id));
+
+        // Verifica a consulta
+        if (!$query) {
+            $this->form_msg = '<p class="form_error">Nada foi encontrado.</p>';
+            return;
+        }
+
+        // Obtém os dados da consulta
+        $fetch_userdata = $query->fetch();
+
+        // Verifica se os dados da consulta estão vazios
+        if (empty($fetch_userdata)) {
+            $this->form_msg = '<p class="form_error">Agenda nao existe.</p>';
             return;
         }
 
         // Configura os dados do formulário
-        $this->form_data = $fetch_data;
+        foreach ($fetch_userdata as $key => $value) {
+            $this->form_data[$key] = $value;
+        }
+
+        // Por questões de segurança, a senha só poderá ser atualizada
+        $this->form_data['age_nome'] = $this->form_data['age_nome'];
+        $this->form_data['age_telefone'] = $this->form_data['age_telefone'];
+        $this->form_data['age_celular'] = $this->form_data['age_celular'];
+        $this->form_data['age_comercial'] = $this->form_data['age_nome'];
     }
 
-// obtem_agenda
+// get_register_form
 
     /**
-     * Insere notícias
+     * Apaga usuários
      *
      * @since 0.1
      * @access public
      */
-    public function insere_noticia() {
+    public function del_agenda($parametros = array()) {
 
-        /*
-          Verifica se algo foi postado e se está vindo do form que tem o campo
-          insere_noticia.
-         */
-        if ('POST' != $_SERVER['REQUEST_METHOD'] || empty($_POST['insere_noticia'])) {
-            return;
-        }
+        // O ID do usuário
+        $age_id = null;
 
-        /*
-          Para evitar conflitos apenas inserimos valores se o parâmetro edit
-          não estiver configurado.
-         */
-        if (chk_array($this->parametros, 0) == 'edit') {
-            return;
-        }
+        // Verifica se existe o parâmetro "del" na URL
+        if (chk_array($parametros, 0) == 'del') {
 
-        // Só pra garantir que não estamos atualizando nada
-        if (is_numeric(chk_array($this->parametros, 1))) {
-            return;
-        }
+            // Mostra uma mensagem de confirmação
+            echo '<p class="alert">Tem certeza que deseja apagar este registro?</p>';
+            echo '<p><a href="' . $_SERVER['REQUEST_URI'] . '/confirma">Sim</a> |
+			<a href="' . HOME_URI . '/agenda">Não</a> </p>';
 
-        // Tenta enviar a imagem
-        $imagem = $this->upload_imagem();
-
-        // Verifica se a imagem foi enviada
-        if (!$imagem) {
-            return;
-        }
-
-        // Remove o campo insere_notica para não gerar problema com o PDO
-        unset($_POST['insere_noticia']);
-
-        // Insere a imagem em $_POST
-        $_POST['noticia_imagem'] = $imagem;
-
-        // Configura a data
-        $data = chk_array($_POST, 'noticia_data');
-        $nova_data = $this->inverte_data($data);
-
-        // Adiciona a data no POST
-        $_POST['noticia_data'] = $nova_data;
-
-        // Insere os dados na base de dados
-        $query = $this->db->insert('noticias', $_POST);
-
-        // Verifica a consulta
-        if ($query) {
-
-            // Retorna uma mensagem
-            $this->form_msg = '<p class="success">Notícia atualizada com sucesso!</p>';
-            return;
-        }
-
-        // :(
-        $this->form_msg = '<p class="error">Erro ao enviar dados!</p>';
-    }
-
-// insere_noticia
-
-    /**
-     * Apaga a notícia
-     *
-     * @since 0.1
-     * @access public
-     */
-    public function apaga_noticia() {
-
-        // O parâmetro del deverá ser enviado
-        if (chk_array($this->parametros, 0) != 'del') {
-            return;
-        }
-
-        // O segundo parâmetro deverá ser um ID numérico
-        if (!is_numeric(chk_array($this->parametros, 1))) {
-            return;
-        }
-
-        // Para excluir, o terceiro parâmetro deverá ser "confirma"
-        if (chk_array($this->parametros, 2) != 'confirma') {
-
-            // Configura uma mensagem de confirmação para o usuário
-            $mensagem = '<p class="alert">Tem certeza que deseja apgar a notícia?</p>';
-            $mensagem .= '<p><a href="' . $_SERVER['REQUEST_URI'] . '/confirma/">Sim</a> | ';
-            $mensagem .= '<a href="' . HOME_URI . '/noticias/adm/">Não</a></p>';
-
-            // Retorna a mensagem e não excluir
-            return $mensagem;
-        }
-
-        // Configura o ID da notícia
-        $noticia_id = (int) chk_array($this->parametros, 1);
-
-        // Executa a consulta
-        $query = $this->db->delete('noticias', 'noticia_id', $noticia_id);
-
-        // Redireciona para a página de administração de notícias
-        echo '<meta http-equiv="Refresh" content="0; url=' . HOME_URI . '/noticias/adm/">';
-        echo '<script type="text/javascript">window.location.href = "' . HOME_URI . '/noticias/adm/";</script>';
-    }
-
-// apaga_noticia
-
-    /**
-     * Envia a imagem
-     *
-     * @since 0.1
-     * @access public
-     */
-    public function upload_imagem() {
-
-        // Verifica se o arquivo da imagem existe
-        if (empty($_FILES['noticia_imagem'])) {
-            return;
-        }
-
-        // Configura os dados da imagem
-        $imagem = $_FILES['noticia_imagem'];
-
-        // Nome e extensão
-        $nome_imagem = strtolower($imagem['name']);
-        $ext_imagem = explode('.', $nome_imagem);
-        $ext_imagem = end($ext_imagem);
-        $nome_imagem = preg_replace('/[^a-zA-Z0-9]/', '', $nome_imagem);
-        $nome_imagem .= '_' . mt_rand() . '.' . $ext_imagem;
-
-        // Tipo, nome temporário, erro e tamanho
-        $tipo_imagem = $imagem['type'];
-        $tmp_imagem = $imagem['tmp_name'];
-        $erro_imagem = $imagem['error'];
-        $tamanho_imagem = $imagem['size'];
-
-        // Os mime types permitidos
-        $permitir_tipos = array(
-            'image/bmp',
-            'image/x-windows-bmp',
-            'image/gif',
-            'image/jpeg',
-            'image/pjpeg',
-            'image/png',
-        );
-
-        // Verifica se o mimetype enviado é permitido
-        if (!in_array($tipo_imagem, $permitir_tipos)) {
-            // Retorna uma mensagem
-            $this->form_msg = '<p class="error">Você deve enviar uma imagem.</p>';
-            return;
-        }
-
-        // Tenta mover o arquivo enviado
-        if (!move_uploaded_file($tmp_imagem, UP_ABSPATH . '/' . $nome_imagem)) {
-            // Retorna uma mensagem
-            $this->form_msg = '<p class="error">Erro ao enviar imagem.</p>';
-            return;
-        }
-
-        // Retorna o nome da imagem
-        return $nome_imagem;
-    }
-
-// upload_imagem
-
-    /**
-     * Paginação
-     *
-     * @since 0.1
-     * @access public
-     */
-    public function paginacao() {
-
-        /*
-          Verifica se o primeiro parâmetro não é um número. Se for é um single
-          e não precisa de paginação.
-         */
-        if (is_numeric(chk_array($this->parametros, 0))) {
-            return;
-        }
-
-        // Obtém o número total de notícias da base de dados
-        $query = $this->db->query(
-                'SELECT COUNT(*) as total FROM noticias '
-        );
-        $total = $query->fetch();
-        $total = $total['total'];
-
-        // Configura o caminho para a paginação
-        $caminho_noticias = HOME_URI . '/noticias/index/page/';
-
-        // Itens por página
-        $posts_per_page = $this->posts_por_pagina;
-
-        // Obtém a última página possível
-        $last = ceil($total / $posts_per_page);
-
-        // Configura a primeira página
-        $first = 1;
-
-        // Configura os offsets
-        $offset1 = 3;
-        $offset2 = 6;
-
-        // Página atual
-        $current = $this->parametros[1] ? $this->parametros[1] : 1;
-
-        // Exibe a primeira página e reticências no início
-        if ($current > 4) {
-            echo "<a href='$caminho_noticias$first'>$first</a> ... ";
-        }
-
-        // O primeiro loop toma conta da parte esquerda dos números
-        for ($i = ( $current - $offset1 ); $i < $current; $i++) {
-            if ($i > 0) {
-                echo "<a href='$caminho_noticias$i'>$i</a>";
-
-                // Diminiu o offset do segundo loop
-                $offset2--;
+            // Verifica se o valor do parâmetro é um número
+            if (
+                    is_numeric(chk_array($parametros, 1)) && chk_array($parametros, 2) == 'confirma'
+            ) {
+                // Configura o ID do usuário a ser apagado
+                $age_id = chk_array($parametros, 1);
             }
         }
 
-        // O segundo loop toma conta da parte direita dos números
-        // Obs.: A primeira expressão realmente não é necessária
-        for (; $i < $current + $offset2; $i++) {
-            if ($i <= $last) {
-                echo "<a href='$caminho_noticias$i'>$i</a>";
-            }
-        }
+        // Verifica se o ID não está vazio
+        if (!empty($age_id)) {
 
-        // Exibe reticências e a última página no final
-        if ($current <= ( $last - $offset1 )) {
-            echo " ... <a href='$caminho_noticias$last'>$last</a>";
+            // O ID precisa ser inteiro
+            $age_id = (int) $age_id;
+
+            // Deleta o usuário
+            $query = $this->db->delete('agenda', 'age_id', $age_id);
+
+            // Redireciona para a página de registros
+            echo '<meta http-equiv="Refresh" content="0; url=' . HOME_URI . '/agenda/">';
+            echo '<script type="text/javascript">window.location.href = "' . HOME_URI . '/agenda/";</script>';
+            return;
         }
     }
 
-// paginacao
+// del_user
+
+    /**
+     * Obtém a lista da agenda
+     *
+     * @since 0.1
+     * @access public
+     */
+    public function listar_agenda() {
+
+        // Simplesmente seleciona os dados na base de dados
+        $query = $this->db->query('SELECT * FROM `agenda` ORDER BY age_id DESC');
+
+        // Verifica se a consulta está OK
+        if (!$query) {
+            return array();
+        }
+        // Preenche a tabela com os dados do usuário
+        return $query->fetchAll();
+    }
+
+// get_agenda_list
 }
-
-// NoticiasAdmModel
