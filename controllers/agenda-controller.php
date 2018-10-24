@@ -68,10 +68,7 @@ class AgendaController extends MainController
 		        // /views/_includes/header.php
       require ABSPATH . '/views/_includes/header.php';
 
-		      // /views/_includes/menu.php
-      require ABSPATH . '/views/_includes/menu.php';
-
-		      // /views/user-register/index.php
+		   // /views/user-register/index.php
       require ABSPATH . '/views/agenda/agenda-view.php';
 
 		      // /views/_includes/footer.php

@@ -46,7 +46,11 @@ class HomeController extends MainController {
 
         /** Carrega os arquivos do view * */
         // /views/_includes/header.php
+        require ABSPATH . '/views/_includes/header.php';
+        // /views/_includes/index.php
         require ABSPATH . '/views/_includes/index.php';
+        // /views/_includes/footer.php
+        require ABSPATH . '/views/_includes/footer.php';
     }
 
 // index

@@ -69,9 +69,9 @@ class AgendaModel {
 
                 // Configura os dados do post para a propriedade $form_data
                 $this->form_data[$key] = $value;
-                
+
                 //echo $key.' - '.$value.'<br />';
-                
+
                 // Nós não permitiremos nenhum campos em branco
                 if (empty($value)) {
 
@@ -115,18 +115,18 @@ class AgendaModel {
             $this->form_msg = '<p class="form_error">Digite um nome.</p>';
             return;
         }
-        
+
         if (empty($this->form_data['age_telefone'])) {
             $this->form_msg = '<p class="form_error">Digite um Telefone.</p>';
             return;
         }
-        
+
 
 
         // Se o ID do usuário não estiver vazio, atualiza os dados
         if (!empty($age_id)) {
 
-            $query = $this->db->update('agenda', 'age_id', $user_id, array(
+            $query = $this->db->update('agenda', 'age_id', $age_id, array(
                 'age_nome' => chk_array($this->form_data, 'age_nome'),
                 'age_telefone' => chk_array($this->form_data, 'age_telefone'),
                 'age_celular' => chk_array($this->form_data, 'age_celular'),
